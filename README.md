@@ -1,4 +1,4 @@
-# Iris Species Classifier - Custom C# Multi-Layer Perceptron (WinForms)
+# NeuralNetPredictor - Iris Species Classifier - Custom C# Multi-Layer Perceptron (WinForms)
 
 CS345 activity: *Real-World Prediction with a Custom Multi-Layer Perceptron in C#*.
 Track: **Multi-class classification**. The only machine-learning code is the course's input -> hidden -> output
@@ -64,3 +64,55 @@ Validation data is used to choose hyper-parameters; the test split is touched on
   `setLearningRates()` method so the learning rate can be tuned (defaults 0.2 / 0.15 unchanged). The UI's single "learning rate" sets both.
 * The course neurons start from random weights using an unseeded `Random`, so results differ slightly from run to run.
   The tuner therefore trains every grid cell **3 times and averages** the scores.
+
+## Hyper-parameter tuning (`Tuning/HyperparameterTuner.cs`)
+
+The grid defaults to learning rate {0.05, 0.1, 0.2, 0.3, 0.5} x hidden nodes {4, 8, 12, 16} x epochs {50, 100, 200, 300, 500}
+(100 experiments x 3 random starts; every pair is trained once and scored at each epoch checkpoint, which equals separate runs but is much faster).
+Experiments are ranked by **validation accuracy** (ties: lower validation loss). The table also shows the train-validation gap
+to spot over-fitting. Edit the three text boxes to try other grids.
+
+### Tuning results (example run - yours will differ slightly because of the random starts)
+
+Averages over the whole grid (validation accuracy / validation loss):
+
+| learning rate | 0.05 | 0.1 | 0.2 | 0.3 | 0.5 |
+|---|---|---|---|---|---|
+| val accuracy | 0.914 | 0.947 | 0.954 | 0.956 | 0.953 |
+| val loss | 0.097 | 0.065 | 0.045 | 0.037 | 0.033 |
+
+| hidden nodes | 4 | 8 | 12 | 16 |
+|---|---|---|---|---|
+| val accuracy | 0.939 | 0.946 | 0.947 | 0.948 |
+
+| epochs | 50 | 100 | 200 | 300 | 500 |
+|---|---|---|---|---|---|
+| val accuracy | 0.901 | 0.952 | 0.956 | 0.956 | 0.958 |
+| val loss | 0.100 | 0.065 | 0.043 | 0.036 | 0.033 |
+
+* Learning rate 0.05 is clearly too slow for this online sigmoid network; accuracy levels off from 0.2 upward and loss keeps falling to 0.5.
+* More hidden nodes help only slightly (4 -> 8 nodes); beyond 8 nothing changes, so a small network is enough.
+* Most of the gain arrives by about 100-200 epochs; after that the validation loss creeps down but accuracy barely moves.
+* The top configuration was lr 0.1, 16 hidden nodes, 100 epochs (validation accuracy 98.6 % averaged over 3 starts).
+  Several others (e.g. lr 0.2, 8-16 nodes, 200 epochs) are within one validation sample of it, so the choice is not sharp.
+  Re-run the grid in the *Tune* tab and paste **your** top rows here.
+
+### Final model (example run)
+
+lr 0.1, 16 hidden nodes, 100 epochs. Test accuracy 95.2 % (20 of 21), macro F1 0.952, majority baseline 33.3 %.
+The single error is a `versicolor` predicted as `virginica`, which is the known overlap between those two species.
+
+## Project layout
+
+```
+NeuralNetPredictor.slnx
+NeuralNetPredictor/
+  Backprop/                      the course classes: INeuron, HNeuron, ONeuron, NeuralNet
+  Network/BackpropClassifier.cs  wrapper: epoch loop, shuffling, loss, accuracy (no learning code)
+  Pipeline/DataPipeline.cs       CSV parsing, missing values, stratified split, scaling
+  Evaluation/ClassificationMetrics.cs   accuracy, precision, recall, F1, confusion matrix
+  Tuning/HyperparameterTuner.cs  grid search
+  UI/MainForm.cs, LossChartControl.cs   WinForms front end (no designer files)
+  Data/iris.csv                  dataset
+```
+
